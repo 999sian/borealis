@@ -658,18 +658,14 @@ TEST(HttpWinRt, RejectsPlaintextAndStopsBeforeSendingCanceledOrExpiredRequests) 
     http::detail::Deadline deadline{request};
     http::detail::TransportRequest transport{
         .url = request.url, .deadline = &deadline, .observer = &observer, .signals = &signals};
-    std::fputs("WinRT preflight: plaintext\n", stderr);
     EXPECT_EQ(http::detail::send_request(transport).error, http::Error::UnsupportedScheme);
-    std::fputs("WinRT preflight: plaintext returned\n", stderr);
     transport.url = "https://127.0.0.1:9/";
     signals.cancelRequested = true;
-    std::fputs("WinRT preflight: cancellation\n", stderr);
     EXPECT_EQ(http::detail::send_request(transport).error, http::Error::Canceled);
     signals.cancelRequested = false;
     const http::Request expired{.url = std::string{transport.url}, .totalTimeout = std::chrono::milliseconds{1}};
     http::detail::Deadline expiredDeadline{expired};
     std::this_thread::sleep_for(std::chrono::milliseconds{5});
     transport.deadline = &expiredDeadline;
-    std::fputs("WinRT preflight: timeout\n", stderr);
     EXPECT_EQ(http::detail::send_request(transport).error, http::Error::Timeout);
 }

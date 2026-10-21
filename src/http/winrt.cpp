@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <cstring>
-#include <cstdio>
 #include <limits>
 
 namespace borealis::http {
@@ -22,7 +21,10 @@ using namespace winrt::Windows::Web::Http::Filters;
 
 struct Apartment {
     Apartment() { winrt::init_apartment(winrt::apartment_type::multi_threaded); }
-    ~Apartment() { winrt::uninit_apartment(); }
+    ~Apartment() {
+        winrt::clear_factory_cache();
+        winrt::uninit_apartment();
+    }
 };
 }  // namespace
 
@@ -38,8 +40,8 @@ const char* backend_name() noexcept {
 
 detail::TransportResult detail::send_request(const TransportRequest& request) {
     try {
-        Apartment apartment;
-        std::fputs("WinRT stage: apartment\n", stderr);
+        // C++/WinRT caches activation factories; keep their apartment alive across requests.
+        thread_local Apartment apartment;
         Deadline::Tracker activity;
         auto wait = [&](const auto& operation) {
             while (operation.Status() == AsyncStatus::Started) {
@@ -61,15 +63,12 @@ detail::TransportResult detail::send_request(const TransportRequest& request) {
         };
 
         HttpBaseProtocolFilter filter;
-        std::fputs("WinRT stage: filter\n", stderr);
         filter.AllowAutoRedirect(false);
         filter.AutomaticDecompression(request.allowCompression);
         filter.CacheControl().ReadBehavior(HttpCacheReadBehavior::NoCache);
         filter.CacheControl().WriteBehavior(HttpCacheWriteBehavior::NoCache);
-        std::fputs("WinRT stage: filter configured\n", stderr);
         HttpClient client{filter};
         Uri uri{winrt::to_hstring(request.url)};
-        std::fputs("WinRT stage: URI\n", stderr);
         auto method = request.method;
         auto headers = request.headers;
 
