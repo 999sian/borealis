@@ -305,6 +305,23 @@ TEST_F(HttpTest, LiveRangeResume) {
     std::filesystem::remove_all(directory, ignored);
 }
 
+TEST_F(HttpTest, LiveGetBody) {
+    const char* url = std::getenv("BOREALIS_HTTP_GET_TEST_URL");
+    if (url == nullptr || *url == '\0') {
+        GTEST_SKIP() << "BOREALIS_HTTP_GET_TEST_URL is not set";
+    }
+    auto task = http::start({
+        .url = url,
+        .totalTimeout = std::chrono::seconds{15},
+    });
+    const auto result = wait_for(task);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result->error, http::Error::None) << result->message;
+    EXPECT_EQ(result->response.statusCode, 200);
+    EXPECT_FALSE(result->response.body.empty());
+    EXPECT_EQ(task.progress().completed, result->response.body.size());
+}
+
 TEST_F(HttpTest, LiveHeadMethod) {
     const char* url = std::getenv("BOREALIS_HTTP_METHOD_TEST_URL");
     if (url == nullptr || *url == '\0') {
