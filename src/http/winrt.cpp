@@ -5,6 +5,7 @@
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Storage.Streams.h>
 #include <winrt/Windows.Web.Http.Filters.h>
+#include <winrt/Windows.Web.Http.Headers.h>
 #include <winrt/Windows.Web.Http.h>
 
 #include <algorithm>
@@ -157,7 +158,7 @@ detail::TransportResult detail::send_request(const TransportRequest& request) {
                 return interrupted(error);
             }
             auto stream = opening.get();
-            Buffer buffer{64 * 1024};
+            IBuffer buffer = Buffer{64 * 1024};
             for (;;) {
                 auto reading =
                     stream.ReadAsync(buffer, buffer.Capacity(), InputStreamOptions::Partial);
