@@ -147,8 +147,13 @@ RandomAccessFile& RandomAccessFile::operator=(RandomAccessFile&& other) noexcept
 RandomAccessFile::OpenResult RandomAccessFile::open(const std::filesystem::path& path) {
     RandomAccessFile file;
 #ifdef _WIN32
+#if defined(AURORA_WINDOWS_STORE)
+    HANDLE handle = CreateFile2(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE,
+        OPEN_EXISTING, nullptr);
+#else
     HANDLE handle = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE,
         nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+#endif
     if (handle == INVALID_HANDLE_VALUE) {
         const auto value = static_cast<int>(GetLastError());
         return {
@@ -665,9 +670,17 @@ bool atomic_replace(const std::filesystem::path& source, const std::filesystem::
     info->FileNameLength = static_cast<DWORD>(nameSize);
     std::memcpy(info->FileName, target.c_str(), nameSize);
 
+#if defined(AURORA_WINDOWS_STORE)
+    CREATEFILE2_EXTENDED_PARAMETERS parameters{};
+    parameters.dwSize = sizeof(parameters);
+    parameters.dwFileFlags = FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS;
+    const auto handle = CreateFile2(source.c_str(), DELETE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, OPEN_EXISTING, &parameters);
+#else
     const auto handle = CreateFileW(source.c_str(), DELETE,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
         FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+#endif
     if (handle == INVALID_HANDLE_VALUE) {
         error = "Failed to open replacement file: " +
                 std::system_category().message(static_cast<int>(GetLastError()));

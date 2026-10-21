@@ -66,6 +66,9 @@ configure_file(
 
 add_library(borealis_core INTERFACE)
 add_library(borealis::core ALIAS borealis_core)
+if (CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
+    target_compile_definitions(borealis_core INTERFACE AURORA_WINDOWS_STORE=1)
+endif ()
 target_include_directories(borealis_core INTERFACE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_BINARY_DIR}/generated
@@ -153,7 +156,12 @@ if (ANDROID)
 endif ()
 
 if (BOREALIS_ENABLE_CRASH)
-    add_library(borealis_crash STATIC src/crash.cpp)
+    if (CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
+        # Device Portal supplies Xbox crash dumps; desktop exception APIs are unavailable.
+        add_library(borealis_crash STATIC src/crash_uwp.cpp)
+    else ()
+        add_library(borealis_crash STATIC src/crash.cpp)
+    endif ()
     add_library(borealis::crash ALIAS borealis_crash)
     target_link_libraries(borealis_crash PUBLIC borealis_log PRIVATE ${CMAKE_DL_LIBS})
     if (WIN32)

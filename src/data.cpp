@@ -695,7 +695,7 @@ Status ManagerBackend::write_descriptor(
         }
     }
 
-#if defined(_WIN32)
+#if defined(_WIN32) && !defined(AURORA_WINDOWS_STORE)
     if (!MoveFileExW(
             temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
     {
