@@ -9,8 +9,11 @@
 #include <winrt/Windows.Web.Http.h>
 
 #include <algorithm>
+#include <condition_variable>
 #include <cstring>
 #include <limits>
+#include <memory>
+#include <mutex>
 
 namespace borealis::http {
 namespace {
@@ -44,16 +47,30 @@ detail::TransportResult detail::send_request(const TransportRequest& request) {
         thread_local Apartment apartment;
         Deadline::Tracker activity;
         auto wait = [&](const auto& operation) {
-            while (operation.Status() == AsyncStatus::Started) {
+            struct Completion {
+                std::mutex mutex;
+                std::condition_variable changed;
+                bool done = false;
+            };
+            auto completion = std::make_shared<Completion>();
+            operation.Completed([completion](const auto&, AsyncStatus) {
+                std::lock_guard lock{completion->mutex};
+                completion->done = true;
+                completion->changed.notify_one();
+            });
+            std::unique_lock lock{completion->mutex};
+            while (!completion->done) {
                 if (request.signals->cancelRequested.load(std::memory_order_relaxed)) {
+                    lock.unlock();
                     operation.Cancel();
                     return Error::Canceled;
                 }
                 if (request.deadline->expired(activity)) {
+                    lock.unlock();
                     operation.Cancel();
                     return Error::Timeout;
                 }
-                operation.wait_for(Deadline::PollInterval);
+                completion->changed.wait_for(lock, Deadline::PollInterval);
             }
             return Error::None;
         };
