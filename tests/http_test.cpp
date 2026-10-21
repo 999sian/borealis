@@ -638,3 +638,34 @@ TEST_F(HttpDownload, SharedDriverRetriesInvalidResumeOnce) {
 }
 
 }  // namespace
+
+TEST(HttpWinRt, RejectsPlaintextAndStopsBeforeSendingCanceledOrExpiredRequests) {
+    if (http::backend() != http::Backend::WinRt) {
+        GTEST_SKIP() << "Windows.Web.Http backend only";
+    }
+    struct Observer final : http::detail::TransportObserver {
+        Directive on_response(int, std::vector<http::Header>) override {
+            ADD_FAILURE() << "Rejected request reached the response observer";
+            return Directive::Abort;
+        }
+        Directive on_data(std::span<const std::byte>) override {
+            ADD_FAILURE() << "Rejected request delivered data";
+            return Directive::Abort;
+        }
+    } observer;
+    borealis::detail::TaskSignals signals;
+    const http::Request request{.url = "http://127.0.0.1:9/"};
+    http::detail::Deadline deadline{request};
+    http::detail::TransportRequest transport{
+        .url = request.url, .deadline = &deadline, .observer = &observer, .signals = &signals};
+    EXPECT_EQ(http::detail::send_request(transport).error, http::Error::UnsupportedScheme);
+    transport.url = "https://127.0.0.1:9/";
+    signals.cancelRequested = true;
+    EXPECT_EQ(http::detail::send_request(transport).error, http::Error::Canceled);
+    signals.cancelRequested = false;
+    const http::Request expired{.url = std::string{transport.url}, .totalTimeout = std::chrono::milliseconds{1}};
+    http::detail::Deadline expiredDeadline{expired};
+    std::this_thread::sleep_for(std::chrono::milliseconds{5});
+    transport.deadline = &expiredDeadline;
+    EXPECT_EQ(http::detail::send_request(transport).error, http::Error::Timeout);
+}

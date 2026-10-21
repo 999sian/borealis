@@ -18,6 +18,7 @@ enum class Backend {
     UrlSession,
     LibCurl,
     Android,
+    WinRt,
 };
 
 enum class Error {

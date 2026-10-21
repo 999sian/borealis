@@ -48,6 +48,9 @@ jobs:
             runner: macos-latest
           - name: Windows MSVC x86_64
             runner: windows-latest
+          - name: Windows MSVC x86_64 (WinRT HTTP)
+            runner: windows-latest
+            flags: -DBOREALIS_HTTP_BACKEND=winrt
 
     steps:
       - uses: actions/checkout@v6
